@@ -1,0 +1,100 @@
+### Variável base (ajuste a porta se necessário)
+@baseUrl = http://localhost:8080
+
+###############################################################################
+# Health
+###############################################################################
+
+### Verificar se a aplicação está no ar
+GET {{baseUrl}}/api/health
+
+###############################################################################
+# Tarefas – Listagem
+###############################################################################
+
+### Listar todas as tarefas
+GET {{baseUrl}}/api/tasks
+
+### Listar apenas tarefas concluídas
+GET {{baseUrl}}/api/tasks?completed=true
+
+### Listar apenas tarefas pendentes
+GET {{baseUrl}}/api/tasks?completed=false
+
+###############################################################################
+# Tarefas – Consulta por ID
+###############################################################################
+
+### Buscar uma tarefa pelo ID (use um id existente, ex.: 1)
+GET {{baseUrl}}/api/tasks/1
+
+### Buscar tarefa inexistente (esperado: 404)
+GET {{baseUrl}}/api/tasks/99999
+
+###############################################################################
+# Tarefas – Criação
+###############################################################################
+
+### Criar tarefa apenas com título
+POST {{baseUrl}}/api/tasks
+Content-Type: application/json
+
+{
+  "title": "Nova tarefa criada pelo requests.http"
+}
+
+### Criar tarefa com título e descrição
+POST {{baseUrl}}/api/tasks
+Content-Type: application/json
+
+{
+  "title": "Tarefa com descrição",
+  "description": "Detalhes opcionais da tarefa"
+}
+
+### Criar tarefa sem título (esperado: 400)
+POST {{baseUrl}}/api/tasks
+Content-Type: application/json
+
+{
+  "description": "Só descrição, sem título"
+}
+
+###############################################################################
+# Tarefas – Atualização
+###############################################################################
+
+### Atualizar tarefa (substituir título, descrição e status)
+PUT {{baseUrl}}/api/tasks/1
+Content-Type: application/json
+
+{
+  "title": "Título atualizado",
+  "description": "Descrição atualizada",
+  "completed": true
+}
+
+### Atualizar apenas o título da tarefa
+PUT {{baseUrl}}/api/tasks/1
+Content-Type: application/json
+
+{
+  "title": "Só mudando o título"
+}
+
+###############################################################################
+# Tarefas – Marcar como concluída
+###############################################################################
+
+### Marcar tarefa como concluída (PATCH)
+PATCH {{baseUrl}}/api/tasks/1/complete
+
+###############################################################################
+# Tarefas – Exclusão
+###############################################################################
+
+### Excluir uma tarefa (substitua 2 pelo id desejado)
+DELETE {{baseUrl}}/api/tasks/2
+
+### Excluir tarefa inexistente (esperado: 404)
+DELETE {{baseUrl}}/api/tasks/99999
