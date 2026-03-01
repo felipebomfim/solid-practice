@@ -1,6 +1,8 @@
 package com.example.solidpractice.task;
 
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -10,6 +12,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -23,7 +27,10 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import com.example.solidpractice.AbstractIntegrationTest;
+import com.example.solidpractice.task.dto.TaskResponse;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 class TaskControllerIntegrationTest extends AbstractIntegrationTest {
 
@@ -31,7 +38,7 @@ class TaskControllerIntegrationTest extends AbstractIntegrationTest {
     private WebApplicationContext webApplicationContext;
 
     private MockMvc mockMvc;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @BeforeEach
     void setUp() {
@@ -42,6 +49,10 @@ class TaskControllerIntegrationTest extends AbstractIntegrationTest {
     @DisplayName("GET /api/tasks")
     class ListTasks {
 
+            // Optionally verify the ordering manually, since JsonPathResultMatchers doesn't
+            // support isBefore check.
+            // Example: Parse and compare in the test body if strict check is desired.
+            // Let's do it
         @Test
         void returnsListOfTasks() throws Exception {
             mockMvc.perform(get("/api/tasks"))
@@ -69,10 +80,28 @@ class TaskControllerIntegrationTest extends AbstractIntegrationTest {
                     .andExpect(jsonPath("$").isArray())
                     .andExpect(jsonPath("$[*].completed", everyItem(is(true))));
         }
+
+        @Test
+        void returnsTasksOrderedByCreatedAtDesc() throws Exception {
+            mockMvc.perform(get("/api/tasks"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isArray());
+
+            List<TaskResponse> tasks = objectMapper.readValue(mockMvc.perform(get("/api/tasks"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isArray())
+                    .andReturn().getResponse().getContentAsString(), new TypeReference<List<TaskResponse>>() {
+                    });
+
+            // Check that tasks are sorted by createdAt in descending order (pairs i, i+1)
+            for (int i = 0; i < Math.min(tasks.size(), 10) - 1; i++) {
+                Instant current = tasks.get(i).createdAt();
+                Instant next = tasks.get(i + 1).createdAt();
+                assertThat(current.compareTo(next), greaterThanOrEqualTo(0));
+            }
+        }
     }
 
-    @Nested
-    @DisplayName("GET /api/tasks/{id}")
     class GetTaskById {
 
         @Test
@@ -130,7 +159,8 @@ class TaskControllerIntegrationTest extends AbstractIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}"))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.error").value("title is required"));
+                    .andExpect(jsonPath("$.errors[0].field").value("title"))
+                    .andExpect(jsonPath("$.errors[0].message").value("title is required"));
         }
 
         @Test
@@ -139,7 +169,9 @@ class TaskControllerIntegrationTest extends AbstractIntegrationTest {
             mockMvc.perform(post("/api/tasks")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0].field").value("title"))
+                    .andExpect(jsonPath("$.errors[0].message").value("title is required"));
         }
     }
 
@@ -170,6 +202,17 @@ class TaskControllerIntegrationTest extends AbstractIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body))
                     .andExpect(status().isNotFound());
+        }
+
+        @Test
+        void returns400WhenTitleBlank() throws Exception {
+            String body = objectMapper.writeValueAsString(Map.of("title", "   "));
+            mockMvc.perform(put("/api/tasks/1")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0].field").value("title"))
+                    .andExpect(jsonPath("$.errors[0].message").value("title cannot be blank when provided"));
         }
     }
 
